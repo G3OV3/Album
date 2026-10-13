@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Album</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+</head>
+
+<body class="font-['Inter',sans-serif] min-h-screen overflow-x-hidden text-purple-50 bg-[#170d1f] bg-[radial-gradient(ellipse_at_top,#3b2354_0%,#23142f_55%,#170d1f_100%)]">
+
+  <!-- grain overlay -->
+  <div class="fixed inset-0 pointer-events-none z-50"
+       style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E&quot;)"></div>
+
+  <header class="max-w-3xl mx-auto text-center pt-8 pb-4 sm:pt-14 sm:pb-8 px-6 [@media(max-height:500px)]:hidden"></header>
+
+  <main class="flex flex-col items-center px-4 pb-12 pt-4">
+    <div class="[perspective:2000px] w-full flex justify-center">
+      <div id="book"></div>
+    </div>
+
+    <!-- controls -->
+    <div class="mt-8 flex items-center gap-3 sm:gap-6">
+      <button id="prev"
+              class="px-4 sm:px-5 py-2 rounded-full border border-purple-300/30 text-purple-100 text-sm hover:bg-purple-300/10 transition disabled:opacity-30 disabled:pointer-events-none">
+        &larr; Prev
+      </button>
+      <p id="status" class="font-['Cormorant_Garamond',serif] italic text-base sm:text-lg text-purple-200/80 w-28 text-center"></p>
+      <button id="next"
+              class="px-4 sm:px-5 py-2 rounded-full border border-purple-300/30 text-purple-100 text-sm hover:bg-purple-300/10 transition disabled:opacity-30 disabled:pointer-events-none">
+        Next &rarr;
+      </button>
+    </div>
+
+  </main>
+
+  <script>
+    const book = document.getElementById('book');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const status = document.getElementById('status');
+
+    const photos = [
+      { src: './img/shs graduation.jpg',  caption: 'Shs Graduation',  tilt: -2 },
+      { src: './img/1st Aniverssary.gif', caption: '1st Anniversary', tilt: 2 },
+      { src: './img/2nd Aniverssary.jpg',   caption: '2nd Anniversary', tilt: -1.5 },
+      { src: './img/2nd photoboth.gif',   caption: 'Last Christmas',  tilt: 2.5 },
+      { src: './img/purple bg.jpg', caption: '', tilt: -2.5 },
+      // { src: './img/2nd photoboth.gif',   caption: 'Christmas',       tilt: 1.5 },
+    ];
+
+    // cover, blank first page, 6 photos, blank last page, back cover
+    const pages = [
+      { type: 'cover' },
+      { type: 'blank' },
+      ...photos.map(p => ({ type: 'photo', ...p })),
+      { type: 'blank' },
+      { type: 'back' },
+    ];
+    // the book needs an even number of pages, so add a blank one before the back cover if needed
+    if (pages.length % 2 !== 0) pages.splice(pages.length - 1, 0, { type: 'blank' });
+    const leafCount = pages.length / 2;
+
+    // single page on phones, two-page spread on bigger screens
+    const mq = window.matchMedia('(min-width: 768px)');
+    let spread = mq.matches;
+    let current = 0;
+    let units = [];
+
+    const bookSpread = "relative [transform-style:preserve-3d] transition-transform duration-700 ease-in-out drop-shadow-[0_30px_40px_rgba(0,0,0,0.55)] aspect-[3/2] w-[max(520px,min(92vw,900px,calc((100svh_-_240px)*1.5)))]";
+    const bookSingle = "relative [transform-style:preserve-3d] drop-shadow-[0_30px_40px_rgba(0,0,0,0.55)] aspect-[3/4] w-[max(260px,min(88vw,440px,calc((100svh_-_240px)*0.75)))]";
+    const faceBase = "absolute inset-0 overflow-hidden [backface-visibility:hidden] [-webkit-backface-visibility:hidden]";
+
+    // ---- saved writing ----
+    const getNote = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+    const saveNote = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+    const notesArea = (idx, extra = '') => `
+      <div contenteditable="true" spellcheck="false" data-key="album-note-${idx}" data-ph="Write something here…"
+           class="${extra} outline-none cursor-text whitespace-pre-wrap break-words overflow-y-auto font-['Cormorant_Garamond',serif] italic text-[18px] leading-[28px] text-purple-900/85 bg-local bg-[length:100%_28px] bg-[linear-gradient(transparent_27px,rgba(107,70,150,0.22)_27px)] empty:before:content-[attr(data-ph)] empty:before:text-purple-900/30"></div>`;
+
+    // ---- one page face ----
+    function faceHTML(page, isLeft, idx, single) {
+      const rounded = single ? 'rounded-md' : isLeft ? 'rounded-l-md' : 'rounded-r-md';
+      const grad = isLeft ? 'bg-gradient-to-l' : 'bg-gradient-to-r';
+      const shade = `<div class="absolute inset-y-0 ${isLeft ? 'right-0' : 'left-0'} w-[8%] ${grad} from-black/15 to-transparent pointer-events-none"></div>`;
+      const num = `<span class="absolute bottom-1.5 ${isLeft ? 'left-4' : 'right-4'} text-[10px] text-purple-900/40 pointer-events-none">${idx}</span>`;
+
+      if (page.type === 'cover') {
+        return `
+          <div class="${faceBase} ${rounded} bg-gradient-to-br from-[#5a3480] to-[#2a1640] border-2 border-amber-200/30 flex flex-col items-center justify-center text-center p-6">
+            <div class="absolute inset-[6%] border border-amber-200/40 rounded-sm pointer-events-none"></div>
+            <p class="text-[10px] tracking-[0.3em] text-amber-100/60 mb-3">A KEEPSAKE</p>
+            <h2 class="font-['Cormorant_Garamond',serif] italic text-[clamp(28px,6vw,48px)] leading-none text-amber-100">Photo Album</h2>
+            <div class="w-12 h-px bg-amber-200/40 my-4"></div>
+            <p class="text-[10px] tracking-[0.2em] text-amber-100/50">TAP TO OPEN</p>
+          </div>`;
+      }
+
+      if (page.type === 'back') {
+        return `
+          <div class="${faceBase} ${rounded} bg-gradient-to-bl from-[#5a3480] to-[#2a1640] border-2 border-amber-200/30 flex items-center justify-center">
+            <div class="absolute inset-[6%] border border-amber-200/40 rounded-sm pointer-events-none"></div>
+            <p class="font-['Cormorant_Garamond',serif] italic text-2xl text-amber-100/70">The End</p>
+          </div>`;
+      }
+
+      if (page.type === 'blank') {
+        return `
+          <div class="${faceBase} ${rounded} bg-[#faf6f0] p-[7%] flex flex-col">
+            ${notesArea(idx, 'flex-1 min-h-0')}
+            ${num}${shade}
+          </div>`;
+      }
+
+      // photo page: the frame hugs the picture, lined writing space underneath
+      return `
+        <div class="${faceBase} ${rounded} [container-type:size] bg-[#faf6f0] p-[6%] flex flex-col gap-[3%]">
+          <figure class="w-fit max-w-[84%] mx-auto shrink-0 bg-white p-[3%] pb-[12%] shadow-[0_8px_18px_-6px_rgba(0,0,0,0.35)] relative" style="transform:rotate(${page.tilt}deg)">
+            <img src="${page.src}" alt="${page.caption}" class="block w-auto h-auto min-w-[45cqw] max-w-full max-h-[44cqh]" onerror="this.style.display='none'">
+            <figcaption class="font-['Cormorant_Garamond',serif] italic absolute bottom-[2.5%] left-0 w-full text-center text-[clamp(13px,1.9vw,19px)] text-purple-900/70">${page.caption}</figcaption>
+          </figure>
+          ${notesArea(idx, 'flex-1 min-h-[3.5rem]')}
+          ${num}${shade}
+        </div>`;
+    }
+
+    const backWrap = html => `<div class="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] [-webkit-backface-visibility:hidden]">${html}</div>`;
+    const unitClass = "absolute top-0 h-full origin-left [transform-style:preserve-3d] transition-transform duration-700 ease-in-out cursor-pointer";
+
+    // ---- build the book for the current layout ----
+    function build() {
+      book.innerHTML = '';
+      units = [];
+      book.className = spread ? bookSpread : bookSingle;
+
+      if (spread) {
+        for (let i = 0; i < leafCount; i++) {
+          const leaf = document.createElement('div');
+          leaf.className = unitClass + " left-1/2 w-1/2";
+          leaf.innerHTML = faceHTML(pages[i * 2], false, i * 2, false) +
+                           backWrap(faceHTML(pages[i * 2 + 1], true, i * 2 + 1, false));
+          leaf.addEventListener('click', () => {
+            if (i === current) go(1);
+            else if (i === current - 1) go(-1);
+          });
+          book.appendChild(leaf);
+          units.push(leaf);
+        }
+      } else {
+        pages.forEach((page, i) => {
+          const leaf = document.createElement('div');
+          leaf.className = unitClass + " left-0 w-full";
+          leaf.innerHTML = faceHTML(page, false, i, true);
+          leaf.addEventListener('click', () => { if (i === current) go(1); });
+          book.appendChild(leaf);
+          units.push(leaf);
+        });
+      }
+
+      // restore writing + keep clicks/typing from flipping pages
+      book.querySelectorAll('[data-key]').forEach(el => {
+        el.textContent = getNote(el.dataset.key);
+        el.addEventListener('click', e => e.stopPropagation());
+        el.addEventListener('input', () => saveNote(el.dataset.key, el.innerText.replace(/\n$/, '')));
+      });
+    }
+
+    const maxStep = () => spread ? leafCount : pages.length - 1;
+
+    function applyZ() {
+      units.forEach((u, i) => { u.style.zIndex = i < current ? i : units.length - i; });
+    }
+
+    function render() {
+      units.forEach((u, i) => { u.style.transform = i < current ? 'rotateY(-180deg)' : 'rotateY(0deg)'; });
+
+      // spread: slide the book so a closed cover / back cover stays centered
+      if (spread) {
+        book.style.transform = current === 0 ? 'translateX(-25%)' : current === leafCount ? 'translateX(25%)' : 'translateX(0)';
+      } else {
+        book.style.transform = 'none';
+      }
+
+      prevBtn.disabled = current === 0;
+      nextBtn.disabled = current === maxStep();
+
+      if (current === 0) status.textContent = 'Cover';
+      else if (current === maxStep()) status.textContent = 'The End';
+      else status.textContent = spread ? `Spread ${current} of ${leafCount - 1}` : `Page ${current} of ${pages.length - 2}`;
+    }
+
+    function go(dir) {
+      const next = current + dir;
+      if (next < 0 || next > maxStep()) return;
+      const moving = units[dir > 0 ? current : current - 1];
+      moving.style.zIndex = 100;
+      current = next;
+      render();
+      setTimeout(applyZ, 350);
+    }
+
+    prevBtn.addEventListener('click', () => go(-1));
+    nextBtn.addEventListener('click', () => go(1));
+
+    document.addEventListener('keydown', e => {
+      if (e.target.isContentEditable) return;
+      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') go(-1);
+    });
+
+    // swipe on touch screens
+    let touchX = null;
+    document.addEventListener('touchstart', e => {
+      touchX = e.target.isContentEditable ? null : e.touches[0].clientX;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      if (dx < -50) go(1);
+      if (dx > 50) go(-1);
+      touchX = null;
+    });
+
+    // switch layouts when the screen size crosses the breakpoint
+    mq.addEventListener('change', e => {
+      const wasSpread = spread;
+      spread = e.matches;
+      if (wasSpread && !spread) current = Math.min(current * 2, pages.length - 1);
+      else if (!wasSpread && spread) current = Math.ceil(current / 2);
+      build(); render(); applyZ();
+    });
+
+    build();
+    render();
+    applyZ();
+  </script>
+</body>
+</html>
