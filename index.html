@@ -43,21 +43,30 @@
     const nextBtn = document.getElementById('next');
     const status = document.getElementById('status');
 
+    // readonly: true = that page can't be edited
+    // text = the message already written on that page
     const photos = [
-      { src: './img/shs graduation.jpg',  caption: 'Shs Graduation',  tilt: -2 },
-      { src: './img/1st Aniverssary.gif', caption: '1st Anniversary', tilt: 2 },
-      { src: './img/2nd Aniverssary.jpg', caption: '2nd Anniversary', tilt: -1.5 },
-      { src: './img/2nd photoboth.gif',   caption: 'Last Christmas',  tilt: 2.5 },
+      { src: './img/shs graduation.jpg',  caption: 'Shs Graduation',  tilt: -2,   readonly: true,
+        text: `First Picture natin together. Grabi ang pang aasar ng mga classmate natin. Grabi din yung kilig HAHAHAH` },
+      { src: './img/1st Aniverssary.gif', caption: '1st Anniversary', tilt: 2,    readonly: true,
+        text: `Eto yung time na malayo nating gala and umuulan pa nun. Pero nag enjoy ako sa gala natin, marami din tayong na create na memories. Nag-enjoy ako luv(Ilang beses ba naman na kiss HAHAHAHA)` },
+      { src: './img/2nd Aniverssary.jpg', caption: 'Last Christmas', tilt: -1.5, readonly: true, 
+        text: 'Wala talaga tayong picture nung 2nd Anniversary natin HAHAHAHA. Eto ata yung after natin maanood ng shake rattle and roll na grabi hindi naman nakakatakot HAHAHAHA. Pero meemorable date 😉'
+      },
+      { src: './img/2nd photoboth.gif',   caption: 'Last December 28',  tilt: 2.5, readonly: true,
+        text: `Last Photobooth natin, cute natin dito HAHAHAHA. Pero memorable talaga yung arcade natin, Hindi ko alam racer ka pala, galing mo magdrive, akalain mo yun bago pa umabot sa finish line naunahan mo pa yung kalaban kahit bumabanga-banga ka  HAHAHAHHA.`
+      },
       { src: './img/purple bg.jpg',       caption: '',                tilt: -2.5 },
     ];
 
     // cover, blank first page, photos, blank last page, back cover
-    // readonly: true = nobody can edit that page, it always shows "text"
     const pages = [
       { type: 'cover' },
-      { type: 'blank', readonly: true, text: `Happy 3rd Anniversary Luv😘!
+      { type: 'blank', readonly: true, text: `Happy 3rd Anniversary Luv!
 
-Remember yung last time na sinend ko sa'yo yung website? Eto rin yun, luv. Pinolish ko lang siya, and baka magkaroon pa ng further improvements later on. Anyway, uhm, this website is dedicated for us. I wanted to create something special na para sa atin lang, something we can look back on and remember all the memories we've shared. It's my little way of showing how much you mean to me, luv, and how much I value our relationship.` },
+Remember yung last time na sinend ko sa'yo yung website? Eto rin yun, luv. Pinolish ko lang siya, and baka magkaroon pa ng further improvements later on.
+
+Anyway, uhm, this website is dedicated for us. I wanted to create something special na para sa atin lang, something we can look back on and remember all the memories we've shared. It's my little way of showing how much you mean to me, luv, and how much I value our relationship.` },
       ...photos.map(p => ({ type: 'photo', ...p })),
       { type: 'blank' },
       { type: 'back' },
